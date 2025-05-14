@@ -127,74 +127,85 @@ const resolvers = {
         return `Usuario con email ${email} eliminado correctamente`
     },
 
-    // Crear un nuevo voluntariado (tarjeta, card)
-    createCard: async ({ input }, { currentUser }) => {
-        if (!currentUser?.email) throw new Error("No autenticado");
+    // Crear un nuevo voluntariado (solo el propio usuario puede crear uno)
+    createCard: async ({ input }, _, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
 
         if (currentUser.email !== input.email) {
-            throw new Error("Solo puedes crear voluntariados con tu propio email");
+            throw new Error("Solo puedes crear voluntariados con tu propio email")
         }
 
-        const user = await User.findOne({ email: currentUser.email });
-
-        if (!user) throw new Error("Usuario autenticado no encontrado");
+        const user = await User.findOne({ email: currentUser.email })
+        if (!user) throw new Error("Usuario autenticado no encontrado")
 
         if (user.name !== input.autor) {
-            throw new Error("El autor no corresponde con el usuario autenticado");
+            throw new Error("El autor no corresponde con el usuario autenticado")
         }
 
         if (input.volunType && !["Oferta", "Petición"].includes(input.volunType)) {
-            throw new Error("Tipo de voluntariado incorrecto, debe ser 'Oferta' o 'Petición'");
+            throw new Error("Tipo de voluntariado incorrecto, debe ser 'Oferta' o 'Petición'")
         }
 
-        const newCard = new Card(input);
-        await newCard.save();
+        const newCard = new Card(input)
+        await newCard.save()
 
-        return newCard;
+        return newCard
     },
 
     // Actualiza los datos de un voluntariado
-    updateCard: async ({ cardId, input }, { currentUser }) => {
-        if (!currentUser?.email) throw new Error("No autenticado");
+    updateCard: async ({ cardId, input }, _, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
 
         if (!isValidObjectId(cardId)) {
-            throw new Error("ID de voluntariado inválido");
+            throw new Error("ID de voluntariado inválido")
         }
 
-        const card = await Card.findById(cardId);
-        if (!card) throw new Error("Voluntariado no encontrado");
+        const card = await Card.findById(cardId)
+        if (!card) throw new Error("Voluntariado no encontrado")
 
-        if (card.email !== currentUser.email) {
-            throw new Error("Solo puedes modificar tus propios voluntariados");
+        const dbUser = await User.findOne({ email: currentUser.email })
+        if (!dbUser) throw new Error("Usuario autenticado no encontrado")
+
+        const isAdmin = dbUser.role === "admin"
+        const isOwner = card.email === currentUser.email
+
+        if (!isAdmin && !isOwner) {
+            throw new Error("Solo puedes modificar tus propios voluntariados")
         }
 
         if (input.volunType && !["Oferta", "Petición"].includes(input.volunType)) {
-            throw new Error("Tipo de voluntariado incorrecto, debe ser 'Oferta' o 'Petición'");
+            throw new Error("Tipo de voluntariado incorrecto, debe ser 'Oferta' o 'Petición'")
         }
 
-        await Card.findByIdAndUpdate(cardId, { $set: input });
+        await Card.findByIdAndUpdate(cardId, { $set: input })
 
-        return "Voluntariado actualizado correctamente";
+        return "Voluntariado actualizado correctamente"
     },
 
     // Elimina un voluntariado
-    deleteCard: async ({ cardId }, { currentUser }) => {
-        if (!currentUser?.email) throw new Error("No autenticado");
+    deleteCard: async ({ cardId }, _, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
 
         if (!isValidObjectId(cardId)) {
-            throw new Error("ID de voluntariado inválido");
+            throw new Error("ID de voluntariado inválido")
         }
 
-        const card = await Card.findById(cardId);
-        if (!card) throw new Error("Voluntariado no encontrado");
+        const card = await Card.findById(cardId)
+        if (!card) throw new Error("Voluntariado no encontrado")
 
-        if (card.email !== currentUser.email) {
-            throw new Error("Solo puedes eliminar tus propios voluntariados");
+        const dbUser = await User.findOne({ email: currentUser.email })
+        if (!dbUser) throw new Error("Usuario autenticado no encontrado")
+
+        const isAdmin = dbUser.role === "admin"
+        const isOwner = card.email === currentUser.email
+
+        if (!isAdmin && !isOwner) {
+            throw new Error("Solo puedes eliminar tus propios voluntariados")
         }
 
-        await Card.findByIdAndDelete(cardId);
+        await Card.findByIdAndDelete(cardId)
 
-        return `Voluntariado con ID ${cardId} eliminado correctamente`;
+        return `Voluntariado con ID ${cardId} eliminado correctamente`
     },
 
     // Añadir una tarjeta seleccionada al usuario autenticado
