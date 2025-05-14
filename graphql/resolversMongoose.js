@@ -38,8 +38,6 @@ const resolvers = {
         const user = await User.findOne({ email: currentUser.email })
         if (!user) throw new Error("Usuario no encontrado")
 
-        console.log(currentUser)
-        console.log(user)
         return user
     },
 
@@ -60,26 +58,32 @@ const resolvers = {
     },
 
     // Crear un nuevo usuario
-    createUser: async ({ input }) => {
+    createUser: async ({ input }, { currentUser }) => {
         const existingUser = await User.findOne({ email: input.email })
         if (existingUser) throw new Error("Usuario ya existe")
 
         const hashedPassword = await bcrypt.hash(input.password, 10)
 
-        // solo podrá asignar el rol de "admin" un usuario autenticado que tenga rol de "admin"
+        // Si se intenta crear un usuario con rol "admin"
         if (input.role === "admin") {
-            try {
-                const creator = await User.findOne({ email: currentUser?.email })
-                if (creator?.role === "admin") {
-                    role = "admin"
-                } else {
-                    throw new Error("Solo los administradores pueden crear otros administradores")
-                }
-            } catch {
+            if (!currentUser?.email) {
                 throw new Error("Usuario no autenticado")
             }
+
+            const creator = await User.findOne({ email: currentUser.email })
+            if (!creator || creator.role !== "admin") {
+                throw new Error("Solo los administradores pueden crear otros administradores")
+            }
+        } else {
+            // Elimina el campo "role" si no es admin para que se aplique el valor por defecto del modelo
+            delete input.role
         }
-        const newUser = new User({ ...input, password: hashedPassword })
+
+        const newUser = new User({
+            ...input,
+            password: hashedPassword,
+        })
+
         await newUser.save()
 
         return "Usuario creado correctamente"
@@ -124,13 +128,19 @@ const resolvers = {
     },
 
     // Crear un nuevo voluntariado (tarjeta, card)
-    createCard: async ({ input }) => {
-        const user = await User.findOne({ email: input.email });
+    createCard: async ({ input }, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado");
 
-        if (!user) throw new Error("Usuario (email) del voluntariado no encontrado");
+        if (currentUser.email !== input.email) {
+            throw new Error("Solo puedes crear voluntariados con tu propio email");
+        }
+
+        const user = await User.findOne({ email: currentUser.email });
+
+        if (!user) throw new Error("Usuario autenticado no encontrado");
 
         if (user.name !== input.autor) {
-            throw new Error("No corresponde el autor del voluntariado con el usuario (email)");
+            throw new Error("El autor no corresponde con el usuario autenticado");
         }
 
         if (input.volunType && !["Oferta", "Petición"].includes(input.volunType)) {
@@ -143,48 +153,44 @@ const resolvers = {
         return newCard;
     },
 
+    // Actualiza los datos de un voluntariado
+    updateCard: async ({ cardId, input }, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado");
 
-    // Actualida los datos de un voluntariado
-    updateCard: async ({ cardId, input }) => {
         if (!isValidObjectId(cardId)) {
             throw new Error("ID de voluntariado inválido");
         }
 
-        if (!input.email || !input.autor) {
-            throw new Error("Se requiere email y autor para actualizar el voluntariado");
-        }
+        const card = await Card.findById(cardId);
+        if (!card) throw new Error("Voluntariado no encontrado");
 
-        const user = await User.findOne({ email: input.email });
-
-        if (!user) throw new Error("Usuario (email) del voluntariado no encontrado");
-
-        if (user.name !== input.autor) {
-            throw new Error("No corresponde el autor del voluntariado con el usuario (email)");
+        if (card.email !== currentUser.email) {
+            throw new Error("Solo puedes modificar tus propios voluntariados");
         }
 
         if (input.volunType && !["Oferta", "Petición"].includes(input.volunType)) {
             throw new Error("Tipo de voluntariado incorrecto, debe ser 'Oferta' o 'Petición'");
         }
 
-        const updatedCard = await Card.findByIdAndUpdate(
-            cardId,
-            { $set: input },
-            { new: true }
-        );
-
-        if (!updatedCard) throw new Error("Voluntariado no encontrado");
+        await Card.findByIdAndUpdate(cardId, { $set: input });
 
         return "Voluntariado actualizado correctamente";
     },
 
     // Elimina un voluntariado
-    deleteCard: async ({ cardId }) => {
+    deleteCard: async ({ cardId }, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado");
+
         if (!isValidObjectId(cardId)) {
             throw new Error("ID de voluntariado inválido");
         }
 
         const card = await Card.findById(cardId);
-        if (!card) throw new Error("No se ha encontrado el ID del voluntariado");
+        if (!card) throw new Error("Voluntariado no encontrado");
+
+        if (card.email !== currentUser.email) {
+            throw new Error("Solo puedes eliminar tus propios voluntariados");
+        }
 
         await Card.findByIdAndDelete(cardId);
 
