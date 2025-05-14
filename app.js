@@ -26,9 +26,9 @@ mongooseDB().then(() => {
       rootValue: resolvers,
       context: async (req, res) => {
         const token = req.headers.authorization?.split(" ")[1]
-        const userData = token ? verifyToken(token) : null
+        //const userData = token ? verifyToken(token) : null
         const currentUser = getUserFromToken(token)
-        return { user: userData, currentUser }
+        return { currentUser }
       },
     })
   )

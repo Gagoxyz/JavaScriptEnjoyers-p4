@@ -72,7 +72,7 @@ const schema = buildSchema(`
     login(email: String!, password: String!): AuthPayload
     createUser(input: UserCreate!): String
     updateUser(input: UserInput!): String
-    deleteUser: String
+    deleteUser(email: String!): String
 
     createCard(input: CardCreate!): Card
     updateCard(cardId: String!, input: CardInput!): String

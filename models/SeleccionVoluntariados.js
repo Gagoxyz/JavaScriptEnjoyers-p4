@@ -21,6 +21,6 @@ const selectedCardsSchema = new mongoose.Schema(
 )
 
 // Creamos el modelo de UserCard con el esquema definido
-const SelectedCards = mongoose.model('SelectedCards', selectedCardsSchema)
+const SelectedCards = mongoose.model('SelectedCards', selectedCardsSchema, 'selectedcards')
 
 module.exports = SelectedCards

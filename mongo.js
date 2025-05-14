@@ -1,3 +1,4 @@
+require('dotenv').config()
 const { MongoClient } = require("mongodb"); // Importamos MongoClient desde mongodb
 
 const uri = "mongodb://localhost:27017"; // URI de conexión a MongoDB local
