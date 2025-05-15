@@ -31,6 +31,16 @@ const resolvers = {
         return userCards.selectedCards
     },
 
+    // Obtener tarjetas de voluntariado del usuario activo
+    getCardsByCurrentUser: async (_, { currentUser }) => {
+        if (!currentUser || !currentUser.email) {
+            throw new Error("No autenticado")
+        }
+
+        const cards = await Card.find({ email: currentUser.email })
+        return cards
+    },
+
     // Obtener los datos del usuario autenticado
     currentUser: async (_, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
@@ -128,7 +138,7 @@ const resolvers = {
     },
 
     // Crear un nuevo voluntariado (solo el propio usuario puede crear uno)
-    createCard: async ({ input }, _, { currentUser }) => {
+    createCard: async ({ input }, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
 
         if (currentUser.email !== input.email) {
@@ -153,7 +163,7 @@ const resolvers = {
     },
 
     // Actualiza los datos de un voluntariado
-    updateCard: async ({ cardId, input }, _, { currentUser }) => {
+    updateCard: async ({ cardId, input }, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
 
         if (!isValidObjectId(cardId)) {
@@ -183,7 +193,7 @@ const resolvers = {
     },
 
     // Elimina un voluntariado
-    deleteCard: async ({ cardId }, _, { currentUser }) => {
+    deleteCard: async ({ cardId }, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
 
         if (!isValidObjectId(cardId)) {

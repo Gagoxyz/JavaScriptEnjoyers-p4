@@ -66,6 +66,7 @@ const schema = buildSchema(`
     userByEmail(email: String!): User
     currentUser: User
     getUserCards: [Card]!
+    getCardsByCurrentUser: [Card]
   }
 
   type Mutation {
@@ -76,7 +77,7 @@ const schema = buildSchema(`
 
     createCard(input: CardCreate!): Card
     updateCard(cardId: String!, input: CardInput!): String
-    deleteCard(cardId: String!): String
+    deleteCard(cardId: ID!): String
 
     addUserCard(cardId: String!): String
     deleteUserCard(cardId: String!): String
