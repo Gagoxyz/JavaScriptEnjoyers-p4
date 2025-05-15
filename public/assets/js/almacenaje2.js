@@ -197,6 +197,8 @@ export async function addNewUser(event) {
   const userName = document.getElementById("userNameId").value
   const userEmail = document.getElementById("userEmailId").value
   const userPassword = document.getElementById("userPasswordId").value
+  const userRoleElement = document.getElementById("userRoleId")
+  const userRole = userRoleElement ? userRoleElement.value : "user"
 
   if (!userName || !userEmail || !userPassword) {
     alert("Por favor, rellena todos los campos.")
@@ -204,15 +206,16 @@ export async function addNewUser(event) {
   }
 
   const query = `
-    mutation CreateUser($name: String!, $email: String!, $password: String!) {
-      createUser(input: { name: $name, email: $email, password: $password })
+    mutation CreateUser($name: String!, $email: String!, $password: String!, $role: String!) {
+      createUser(input: { name: $name, email: $email, password: $password, role: $role })
     }
   `
 
   const variables = {
     name: userName,
     email: userEmail,
-    password: userPassword
+    password: userPassword,
+    role: userRole
   }
 
   const token = localStorage.getItem("token")
@@ -227,11 +230,13 @@ export async function addNewUser(event) {
     document.getElementById("userNameId").value = ""
     document.getElementById("userEmailId").value = ""
     document.getElementById("userPasswordId").value = ""
+    if (userRoleElement) userRoleElement.value = "user"
 
   } catch (error) {
     alert("Error al crear el usuario: " + error.message)
   }
 }
+
 
 // Mostrar voluntariados en tabla
 export async function addCardsInTable() {
