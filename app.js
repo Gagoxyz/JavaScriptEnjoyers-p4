@@ -4,6 +4,7 @@ const schema = require('./graphql/schemaMongoose')
 const resolvers = require('./graphql/resolversMongoose')
 const { verifyToken, getUserFromToken } = require('./auth')
 const { mongooseDB } = require('./db/connection')
+const path = require('path')
 
 const PORT = process.env.PORT || 3000
 const route = "graphql"
@@ -13,8 +14,14 @@ const app = express()
 // Middleware JSON
 app.use(express.json())
 
-// Ruta de prueba
-app.get("/", (req, res) => res.send("Bienvenido a mi API GraphQL con Mongoose"))
+// Servir archivos estáticos de /public
+app.use(express.static(path.join(__dirname, 'public')))
+app.use('/assets', express.static(path.join(__dirname, 'assets')))
+
+// Ruta raíz del proyecto
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'))
+})
 
 // Conexión a MongoDB antes de levantar el servidor
 mongooseDB().then(() => {
@@ -26,8 +33,7 @@ mongooseDB().then(() => {
       rootValue: resolvers,
       context: async (req, res) => {
         const token = req.headers.authorization?.split(" ")[1]
-        //const userData = token ? verifyToken(token) : null
-        const currentUser = getUserFromToken(token)
+        const currentUser = token ? getUserFromToken(token) : null
         return { currentUser }
       },
     })
