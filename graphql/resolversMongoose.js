@@ -205,7 +205,7 @@ const resolvers = {
     deleteCard: async ({ cardId }, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
 
-        if (!isValidObjectId(cardId)) {
+        if (!mongoose.Types.ObjectId.isValid(cardId)) {
             throw new Error("ID de voluntariado inválido")
         }
 
