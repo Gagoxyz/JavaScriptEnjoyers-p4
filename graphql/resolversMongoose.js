@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs')
 const { ObjectId } = require('mongodb')
-const { isValidObjectId } = require("mongoose")
+const mongoose = require("mongoose")
 const User = require('../models/Usuario')
 const Card = require('../models/Voluntariado')
 const UserCard = require('../models/SeleccionVoluntariados')
@@ -23,12 +23,21 @@ const resolvers = {
     },
 
     // Obtener tarjetas seleccionadas por el usuario autenticado
-    getUserCards: async ({ currentUser }) => {
+    // getUserCards: async (_, { currentUser }) => {
+    //     if (!currentUser?.email) throw new Error("No autenticado")
+
+    //     const userCards = await UserCard.findOne({ email: currentUser.email })
+    //     //if (!userCards) throw new Error("Usuario no tiene tarjetas seleccionadas")
+    //     return userCards.selectedCards || []
+    // },
+    getUserCards: async (_, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
 
-        const userCards = await UserCard.findOne({ email: currentUser.email })
-        if (!userCards) throw new Error("Usuario no tiene tarjetas seleccionadas")
-        return userCards.selectedCards
+        const userCards = await UserCard.findOne({ email: currentUser.email }).populate("selectedCards")
+
+        if (!userCards) return [] // <- Devuelve array vacío si no hay documento
+
+        return userCards.selectedCards || [].filter(Boolean)
     },
 
     // Obtener tarjetas de voluntariado del usuario activo
@@ -218,9 +227,43 @@ const resolvers = {
         return `Voluntariado con ID ${cardId} eliminado correctamente`
     },
 
-    // Añadir una tarjeta seleccionada al usuario autenticado
+    // // Añadir una tarjeta seleccionada al usuario autenticado
+    // addUserCard: async ({ cardId }, { currentUser }) => {
+    //     if (!currentUser?.email) throw new Error("No autenticado")
+
+    //     const user = await User.findOne({ email: currentUser.email })
+    //     if (!user) throw new Error("Usuario no encontrado")
+
+    //     const card = await Card.findById(cardId)
+    //     if (!card) throw new Error("Card no encontrada")
+
+    //     let userCards = await UserCard.findOne({ email: currentUser.email })
+
+    //     if (userCards) {
+    //         const exists = userCards.selectedCards.some(
+    //             c => String(c._id) === String(card._id)
+    //         )
+    //         if (!exists) {
+    //             userCards.selectedCards.push(card._id)
+    //             await userCards.save()
+    //         }
+    //     } else {
+    //         userCards = new UserCard({
+    //             email: currentUser.email,
+    //             selectedCards: [card]
+    //         })
+    //         await userCards.save()
+    //     }
+
+    //     return "Voluntariado añadido a la selección correctamente"
+    // },
+
     addUserCard: async ({ cardId }, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
+
+        if (!cardId || !mongoose.Types.ObjectId.isValid(cardId)) {
+            throw new Error("ID de tarjeta inválido")
+        }
 
         const user = await User.findOne({ email: currentUser.email })
         if (!user) throw new Error("Usuario no encontrado")
@@ -232,16 +275,16 @@ const resolvers = {
 
         if (userCards) {
             const exists = userCards.selectedCards.some(
-                c => String(c._id) === String(card._id)
+                c => String(c.id) === String(card._id)
             )
             if (!exists) {
-                userCards.selectedCards.push(card)
+                userCards.selectedCards.push(card._id) // solo guarda el ID
                 await userCards.save()
             }
         } else {
             userCards = new UserCard({
                 email: currentUser.email,
-                selectedCards: [card]
+                selectedCards: [card._id] // solo IDs aquí también
             })
             await userCards.save()
         }
@@ -265,7 +308,7 @@ const resolvers = {
 
         await UserCard.updateOne(
             { email: currentUser.email },
-            { $pull: { selectedCards: { _id: objectId } } }
+            { $pull: { selectedCards: objectId } }
         )
 
         return "Voluntariado eliminado de la selección correctamente"

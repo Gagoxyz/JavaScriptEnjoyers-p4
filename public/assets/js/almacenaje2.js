@@ -516,3 +516,221 @@ function drawChart(userStats) {
     ctx.restore()
   })
 }
+
+/*
+* API DRAG&DROP
+*/
+export async function getCardsFromDB() {
+  try {
+    const token = localStorage.getItem("token") || ""
+    const [allCardsData, selectedData] = await Promise.all([
+      graphqlRequest(
+        `
+          query {
+            getCards {
+              _id
+              title
+              description
+              date
+              email
+              volunType
+            }
+          }
+        `,
+        {},
+        token
+      ),
+      graphqlRequest(
+        `
+          query {
+            getUserCards {
+              _id
+              title
+              description
+              date
+              email
+              volunType
+            }
+          }
+        `,
+        {},
+        token
+      )
+    ])
+
+    const selectedTitles = new Set(
+      selectedData.getUserCards
+        .filter(c => c && c.title) // <--- Esto filtra nulos o sin título
+        .map(c =>
+          c.title.trim().toLowerCase().replace(/\s+/g, '_')
+        )
+    )
+
+    allCardsData.getCards.forEach(card => {
+      const titleSafe = card.title.trim().toLowerCase().replace(/\s+/g, '_')
+      if (!selectedTitles.has(titleSafe)) {
+        showCardInDragContainer(card)
+      }
+    })
+  } catch (error) {
+    console.error('Error al obtener tarjetas:', error)
+  }
+}
+
+export async function loadSelectedCards() {
+  try {
+    const token = localStorage.getItem("token") || ""
+    const data = await graphqlRequest(
+      `
+        query {
+          getUserCards {
+            _id
+            title
+            description
+            date
+            email
+            volunType
+          }
+        }
+      `,
+      {},
+      token
+    )
+
+    data.getUserCards.forEach(addCardToDropContainer)
+  } catch (error) {
+    console.error("Error al cargar tarjetas seleccionadas:", error)
+  }
+}
+
+export async function saveSelectedCard({ _id }) {
+  try {
+    const token = localStorage.getItem("token") || ""
+    await graphqlRequest(
+      `
+        mutation ($cardId: String!) {
+          addUserCard(cardId: $cardId)
+        }
+      `,
+      { cardId: _id },
+      token
+    )
+  } catch (error) {
+    console.error("Error al guardar selección:", error)
+  }
+}
+
+export async function removeSelectedCard(cardTitleSafe) {
+  try {
+    const token = localStorage.getItem("token") || ""
+    const data = await graphqlRequest(
+      `
+        query {
+          getUserCards {
+            _id
+            title
+          }
+        }
+      `,
+      {},
+      token
+    )
+
+    const card = data.getUserCards.find(
+      c => c.title.trim().toLowerCase().replace(/\s+/g, '_') === cardTitleSafe
+    )
+
+    if (!card) return
+
+    await graphqlRequest(
+      `
+        mutation ($cardId: String!) {
+          deleteUserCard(cardId: $cardId)
+        }
+      `,
+      { cardId: card._id },
+      token
+    )
+  } catch (error) {
+    console.error("Error al eliminar selección:", error)
+  }
+}
+
+export function showCardInDragContainer(cardData) {
+  const titleSafe = cardData.title.trim().toLowerCase().replace(/\s+/g, '_')
+
+  const cardElement = document.createElement("div")
+  cardElement.classList.add("m-3", "dragBox", "col-6", "col-md-6")
+  cardElement.setAttribute("draggable", "true")
+  cardElement.setAttribute("data-title", titleSafe)
+  cardElement.setAttribute("data-id", cardData._id)
+
+  cardElement.innerHTML = `
+    <div class="card ${cardData.volunType === "Oferta" ? "text-bg-primary" : "text-bg-success"}" style="max-width: 18rem;">
+      <div class="card-body">
+        <h5 class="card-title fw-bold textPoppinsFont">${cardData.title}</h5>
+        <p class="card-text textRockSFont">${cardData.description}</p>
+        <p class="card-text fst-italic textPatrickFont">Fecha publicación ${cardData.date}</p>
+        <p class="card-text text-decoration-underline textPatrickFont">Publicado por ${cardData.email}</p>
+      </div>
+    </div>
+  `
+
+  cardElement.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", titleSafe)
+  })
+
+  dragContainer.appendChild(cardElement)
+}
+
+export function addCardToDropContainer(cardData) {
+  const titleSafe = cardData.title.trim().toLowerCase().replace(/\s+/g, '_')
+
+  const cardElement = document.createElement("div")
+  cardElement.classList.add("m-3", "dragBox", "col-6", "col-md-6")
+  cardElement.setAttribute("draggable", "true")
+  cardElement.setAttribute("data-title", titleSafe)
+  cardElement.setAttribute("data-id", cardData._id)
+
+  cardElement.innerHTML = `
+    <div class="card ${cardData.volunType === "Oferta" ? "text-bg-primary" : "text-bg-success"}" style="max-width: 18rem;">
+      <div class="card-body">
+        <h5 class="card-title fw-bold textPoppinsFont">${cardData.title}</h5>
+        <p class="card-text textRockSFont">${cardData.description}</p>
+        <p class="card-text fst-italic textPatrickFont">Fecha publicación ${cardData.date}</p>
+        <p class="card-text text-decoration-underline textPatrickFont">Publicado por ${cardData.email}</p>
+      </div>
+    </div>
+  `
+
+  cardElement.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", titleSafe)
+  })
+
+  dropContainer.appendChild(cardElement)
+}
+
+export function moveCard(cardTitleSafe, sourceContainer, targetContainer) {
+  const existsInTarget = targetContainer.querySelector(`[data-title="${cardTitleSafe}"]`)
+  if (existsInTarget) return
+
+  const draggedElement = sourceContainer.querySelector(`[data-title="${cardTitleSafe}"]`)
+  if (!draggedElement) return
+
+  const cardClone = draggedElement.cloneNode(true)
+
+  cardClone.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", cardTitleSafe)
+  })
+
+  targetContainer.appendChild(cardClone)
+  sourceContainer.removeChild(draggedElement)
+
+  const cardId = draggedElement.getAttribute("data-id")
+
+  if (sourceContainer === dropContainer && targetContainer === dragContainer) {
+    removeSelectedCard(cardTitleSafe)
+  } else if (sourceContainer === dragContainer && targetContainer === dropContainer) {
+    saveSelectedCard({ _id: cardId })
+  }
+}

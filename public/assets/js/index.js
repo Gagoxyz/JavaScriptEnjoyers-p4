@@ -3,7 +3,7 @@
 */
 
 // importamos las funciones necesarias desde "almacenaje.js"
-import { showActiveUser, loadUsersToStorage, startDataBase, getCardsFromDB, moveCard, loadSelectedCards } from './almacenaje.js'
+import { showActiveUser, getCardsFromDB, moveCard, loadSelectedCards } from './almacenaje2.js'
 
 // declaramos constantes para identificar los 2 contenedores
 const dragContainer = document.getElementById("dragContainer")
@@ -54,9 +54,7 @@ dragContainer.addEventListener("drop", (e) => {
 
 // listener para ejecutar funciones cuando el DOM haya cargado completamente
 window.addEventListener("DOMContentLoaded", () => {
-    loadUsersToStorage()
     showActiveUser()
-    startDataBase()
     getCardsFromDB()
     loadSelectedCards()
 })
