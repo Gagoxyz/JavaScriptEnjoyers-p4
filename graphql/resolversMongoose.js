@@ -23,13 +23,6 @@ const resolvers = {
     },
 
     // Obtener tarjetas seleccionadas por el usuario autenticado
-    // getUserCards: async (_, { currentUser }) => {
-    //     if (!currentUser?.email) throw new Error("No autenticado")
-
-    //     const userCards = await UserCard.findOne({ email: currentUser.email })
-    //     //if (!userCards) throw new Error("Usuario no tiene tarjetas seleccionadas")
-    //     return userCards.selectedCards || []
-    // },
     getUserCards: async (_, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
 
@@ -147,7 +140,7 @@ const resolvers = {
     },
 
     // Crear un nuevo voluntariado (solo el propio usuario puede crear uno)
-    createCard: async ({ input }, { currentUser }) => {
+    createCard: async ({ input }, { currentUser, io }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
 
         if (currentUser.email !== input.email) {
@@ -167,6 +160,8 @@ const resolvers = {
 
         const newCard = new Card(input)
         await newCard.save()
+
+        io.emit('nuevo-voluntariado', newCard)
 
         return newCard
     },
@@ -228,36 +223,6 @@ const resolvers = {
     },
 
     // // Añadir una tarjeta seleccionada al usuario autenticado
-    // addUserCard: async ({ cardId }, { currentUser }) => {
-    //     if (!currentUser?.email) throw new Error("No autenticado")
-
-    //     const user = await User.findOne({ email: currentUser.email })
-    //     if (!user) throw new Error("Usuario no encontrado")
-
-    //     const card = await Card.findById(cardId)
-    //     if (!card) throw new Error("Card no encontrada")
-
-    //     let userCards = await UserCard.findOne({ email: currentUser.email })
-
-    //     if (userCards) {
-    //         const exists = userCards.selectedCards.some(
-    //             c => String(c._id) === String(card._id)
-    //         )
-    //         if (!exists) {
-    //             userCards.selectedCards.push(card._id)
-    //             await userCards.save()
-    //         }
-    //     } else {
-    //         userCards = new UserCard({
-    //             email: currentUser.email,
-    //             selectedCards: [card]
-    //         })
-    //         await userCards.save()
-    //     }
-
-    //     return "Voluntariado añadido a la selección correctamente"
-    // },
-
     addUserCard: async ({ cardId }, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
 

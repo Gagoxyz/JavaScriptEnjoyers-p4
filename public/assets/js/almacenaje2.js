@@ -305,7 +305,7 @@ export async function addCardsInTable() {
   }
 }
 
-function addCardRow(card) {
+export function addCardRow(card) {
   const tbody = document.querySelector("#volTableId tbody")
   const row = document.createElement("tr")
 
