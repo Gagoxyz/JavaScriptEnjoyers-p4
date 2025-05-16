@@ -14,7 +14,32 @@ const resolvers = {
 
     // Obtener todas las cards de voluntariado
     getCards: async () => {
-        return await Card.find()
+        try {
+            const allSelected = await UserCard.find({}, { selectedCards: 1, _id: 0 })
+
+            const selectedCardIds = new Set()
+
+            allSelected.forEach(userSelected => {
+                if (userSelected.selectedCards && Array.isArray(userSelected.selectedCards)) {
+                    userSelected.selectedCards.forEach(cardId => {
+                        if (mongoose.Types.ObjectId.isValid(cardId)) {
+                            selectedCardIds.add(String(cardId))
+                        }
+                    })
+                }
+            })
+
+            console.log("IDs seleccionados a excluir (válidos):", Array.from(selectedCardIds))
+
+            const availableCards = await Card.find({
+                _id: { $nin: Array.from(selectedCardIds) }
+            })
+
+            return availableCards
+        } catch (error) {
+            console.error("Error real en getCards:", error)
+            throw new Error("Error al obtener tarjetas disponibles")
+        }
     },
 
     // Obtener un usuario por email
@@ -222,7 +247,7 @@ const resolvers = {
         return `Voluntariado con ID ${cardId} eliminado correctamente`
     },
 
-    // // Añadir una tarjeta seleccionada al usuario autenticado
+    // Añadir una tarjeta seleccionada al usuario autenticado
     addUserCard: async ({ cardId }, { currentUser }) => {
         if (!currentUser?.email) throw new Error("No autenticado")
 
