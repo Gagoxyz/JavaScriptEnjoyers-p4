@@ -186,7 +186,6 @@ const resolvers = {
         const newCard = new Card(input)
         await newCard.save()
 
-        io.emit('nuevo-voluntariado', newCard)
 
         return newCard
     },
@@ -243,7 +242,6 @@ const resolvers = {
         }
 
         await Card.findByIdAndDelete(cardId)
-
         return `Voluntariado con ID ${cardId} eliminado correctamente`
     },
 

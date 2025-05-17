@@ -58,3 +58,9 @@ window.addEventListener("DOMContentLoaded", () => {
     getCardsFromDB()
     loadSelectedCards()
 })
+
+const socket = io();
+socket.on("actualizar usercards",()=>{
+    getCardsFromDB()
+    loadSelectedCards()
+})

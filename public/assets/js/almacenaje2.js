@@ -183,8 +183,8 @@ async function deleteUser(email) {
   try {
     await graphqlRequest(query, variables, token)
     alert("Usuario eliminado correctamente")
-
-    showUsersTable()
+    const socket = io();
+    socket.emit("usuario eliminado");
   } catch (error) {
     alert(error.message)
   }
@@ -225,7 +225,8 @@ export async function addNewUser(event) {
 
     alert("Usuario creado correctamente")
 
-    showUsersTable()
+    const socket = io();
+    socket.emit("usuario añadido");
 
     document.getElementById("userNameId").value = ""
     document.getElementById("userEmailId").value = ""
@@ -351,11 +352,12 @@ async function deleteCard(idCard) {
 
   try {
     const data = await graphqlRequest(query, variables, token)
+    const socket = io()
 
     if (data) {
       const message = data.deleteCard
       alert(message)
-      addCardsInTable()
+      socket.emit("voluntariado eliminado");
     } else {
       alert("No se pudo eliminar el voluntariado")
     }
@@ -418,7 +420,8 @@ export async function addCard() {
       document.getElementById("newVolDescriptionId").value = ""
       document.getElementById("volSelectId").value = ""
 
-      addCardsInTable()
+      const socket = io();
+      socket.emit("nuevo voluntariado");
     } else {
       alert("No se pudo registrar el voluntariado")
     }
@@ -565,6 +568,8 @@ export async function getCardsFromDB() {
           c.title.trim().toLowerCase().replace(/\s+/g, '_')
         )
     )
+    document.getElementById("dragContainer").innerHTML= `
+                <h4>Disponibles</h4>`;
 
     allCardsData.getCards.forEach(card => {
       const titleSafe = card.title.trim().toLowerCase().replace(/\s+/g, '_')
@@ -596,6 +601,9 @@ export async function loadSelectedCards() {
       {},
       token
     )
+    document.getElementById("dropContainer").innerHTML = `
+                <h4>Selección</h4>
+            `
 
     data.getUserCards.forEach(addCardToDropContainer)
   } catch (error) {
@@ -615,6 +623,8 @@ export async function saveSelectedCard({ _id }) {
       { cardId: _id },
       token
     )
+    const socket = io();
+    socket.emit("usercard añadida");
   } catch (error) {
     console.error("Error al guardar selección:", error)
   }
@@ -651,6 +661,8 @@ export async function removeSelectedCard(cardTitleSafe) {
       { cardId: card._id },
       token
     )
+    const socket = io();
+    socket.emit("usercard eliminada");
   } catch (error) {
     console.error("Error al eliminar selección:", error)
   }

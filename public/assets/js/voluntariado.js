@@ -21,7 +21,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
 const socket = io()
 
-socket.on("nuevo-voluntariado", (card) => {
-    console.log("Se ha añadido un nuevo voluntariado por WebSockets:", card)
-    addCardRow(card)
+
+socket.on("actualizar voluntariados",()=>{
+    addCardsInTable();
 })

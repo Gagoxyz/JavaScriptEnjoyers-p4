@@ -16,13 +16,13 @@ mongoose.connect(uri, { dbName })
       try {
         // 1. Establecer role: "admin" para el usuario dgago@uoc.edu
         await User.updateOne(
-          { email: "dgago@uoc.edu" },
+          { email: "test@test.com" },
           { $set: { role: "admin" } }
         );
 
         // 2. Establecer role: "user" para todos los demás usuarios
         await User.updateMany(
-          { email: { $ne: "dgago@uoc.edu" } },
+          { email: { $ne: "test@test.com" } },
           { $set: { role: "user" } }
         );
 

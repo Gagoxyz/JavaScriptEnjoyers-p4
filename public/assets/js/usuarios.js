@@ -39,3 +39,8 @@ async function setupRoleInputIfAdmin() {
         form.insertBefore(roleInputDiv, submitBtn.parentElement)
     }
 }
+
+const socket = io();
+socket.on("actualizar usuarios", ()=>{
+        showUsersTable()
+})

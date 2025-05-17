@@ -2,7 +2,8 @@ const users = [
     { name: "Adolfo Tacaño", email: "atacano@uoc.edu", password: "1234" },
     { name: "Paco García", email: "pgarcia@uoc.edu", password: "1234" },
     { name: "Luisa Gartiguru", email: "lgartiguru@uoc.edu", password: "1234" },
-    { name: "Ana Paredes", email: "aparedes@uoc.edu", password: "1234" }
+    { name: "Ana Paredes", email: "aparedes@uoc.edu", password: "1234" },
+    { name: "Michael", email: "test@test.com", password: "1234"}
   ];
   
   const cards = [

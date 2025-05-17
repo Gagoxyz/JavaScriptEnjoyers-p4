@@ -54,14 +54,16 @@ mongooseDB().then(() => {
   // Conexión con SocketIO
   io.on('connection', (socket) => {
     console.log('🟢 Nuevo cliente conectado:', socket.id)
+    socket.on("nuevo voluntariado",()=> {io.emit("actualizar voluntariados")});
+    socket.on("voluntariado eliminado",()=> {io.emit("actualizar voluntariados")});
+    socket.on("usuario añadido",()=> {io.emit("actualizar usuarios")});
+    socket.on("usuario eliminado",()=> {io.emit("actualizar usuarios")});
+    socket.on("usercard añadida",()=> {io.emit("actualizar usercards")});
+    socket.on("usercard eliminada",()=> {io.emit("actualizar usercards")});
+
+
 
     // Definimos los eventos
-    socket.on('nueva-publicacion', (data) => {
-      console.log('📣 Nueva publicación recibida:', data)
-
-      // Emitir a todos los clientes conectados
-      io.emit('actualizar-publicaciones', data)
-    })
 
     // Desconexión
     socket.on('disconnect', () => {
