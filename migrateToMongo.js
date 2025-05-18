@@ -1,7 +1,8 @@
 const { MongoClient } = require("mongodb"); // Importamos MongoClient desde mongodb
 const { users, cards } = require("./data/storage"); // Importamos los datos de usuarios y tarjetas desde storage.js
+require('dotenv').config() // importamos dotenv para poder utilizar las variables de entorno
 
-const uri = "mongodb://localhost:27017"; // URI de conexión a MongoDB local
+const uri = process.env.MONGO_URI; // URI de conexión a MongoDB local
 const dbName = "voluntariado"; // Nombre de la base de datos
 
 /**

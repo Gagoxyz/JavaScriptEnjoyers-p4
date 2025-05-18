@@ -1,171 +1,306 @@
 const bcrypt = require('bcryptjs')
 const { ObjectId } = require('mongodb')
-
+const mongoose = require("mongoose")
 const User = require('../models/Usuario')
 const Card = require('../models/Voluntariado')
 const UserCard = require('../models/SeleccionVoluntariados')
 const auth = require('../auth')
 
-const resolversMongoose = {
-    Query: {
-        // Obtener todos los usuarios
-        getUsers: async () => {
-            return await User.find()
-        },
+const resolvers = {
+    // Obtener todos los usuarios
+    getUsers: async () => {
+        return await User.find()
+    },
 
-        // Obtener todas las cards de voluntariado
-        getCards: async () => {
-            return await Card.find()
-        },
+    // Obtener todas las cards de voluntariado
+    getCards: async () => {
+        try {
+            const allSelected = await UserCard.find({}, { selectedCards: 1, _id: 0 })
 
-        // Obtener un usuario por email
-        userByEmail: async (_, { email }) => {
-            return await User.findOne({ email })
-        },
+            const selectedCardIds = new Set()
 
-        // Obtener tarjetas seleccionadas por el usuario autenticado
-        getUserCards: async (_, __, { currentUser }) => {
-            if (!currentUser?.email) throw new Error("No autenticado")
+            allSelected.forEach(userSelected => {
+                if (userSelected.selectedCards && Array.isArray(userSelected.selectedCards)) {
+                    userSelected.selectedCards.forEach(cardId => {
+                        if (mongoose.Types.ObjectId.isValid(cardId)) {
+                            selectedCardIds.add(String(cardId))
+                        }
+                    })
+                }
+            })
 
-            const userCards = await UserCard.findOne({ email: currentUser.email })
-            if (!userCards) throw new Error("Usuario no tiene tarjetas seleccionadas")
-            return userCards.selectedCards
-        },
+            console.log("IDs seleccionados a excluir (válidos):", Array.from(selectedCardIds))
 
-        // Obtener los datos del usuario autenticado
-        currentUser: async (_, __, { currentUser }) => {
-            if (!currentUser?.email) throw new Error("No autenticado")
+            const availableCards = await Card.find({
+                _id: { $nin: Array.from(selectedCardIds) }
+            })
 
-            const user = await User.findOne({ email: currentUser.email })
-            if (!user) throw new Error("Usuario no encontrado")
-
-            return user
+            return availableCards
+        } catch (error) {
+            console.error("Error real en getCards:", error)
+            throw new Error("Error al obtener tarjetas disponibles")
         }
     },
 
-    Mutation: {
-        // Login: devuelve token si es correcto
-        login: async (_, { email, password }) => {
-            const user = await User.findOne({ email })
-            if (!user) throw new Error("Usuario no encontrado")
+    // Obtener un usuario por email
+    userByEmail: async ({ email }) => {
+        return await User.findOne({ email })
+    },
 
-            const valid = await bcrypt.compare(password, user.password)
-            if (!valid) throw new Error("Contraseña incorrecta")
+    // Obtener tarjetas seleccionadas por el usuario autenticado
+    getUserCards: async (_, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
 
-            const token = auth.generateToken({ email: user.email, role: user.role })
+        const userCards = await UserCard.findOne({ email: currentUser.email }).populate("selectedCards")
 
-            return {
-                message: "Autenticación exitosa",
-                token
+        if (!userCards) return [] // <- Devuelve array vacío si no hay documento
+
+        return userCards.selectedCards || [].filter(Boolean)
+    },
+
+    // Obtener tarjetas de voluntariado del usuario activo
+    getCardsByCurrentUser: async (_, { currentUser }) => {
+        if (!currentUser || !currentUser.email) {
+            throw new Error("No autenticado")
+        }
+
+        const cards = await Card.find({ email: currentUser.email })
+        return cards
+    },
+
+    // Obtener los datos del usuario autenticado
+    currentUser: async (_, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
+
+        const user = await User.findOne({ email: currentUser.email })
+        if (!user) throw new Error("Usuario no encontrado")
+
+        return user
+    },
+
+    // // Login: devuelve token si es correcto
+    login: async ({ email, password }) => {
+        const user = await User.findOne({ email })
+        if (!user) throw new Error("Usuario no encontrado")
+
+        const valid = await bcrypt.compare(password, user.password)
+        if (!valid) throw new Error("Contraseña incorrecta")
+
+        const token = auth.generateToken({ email: user.email, role: user.role })
+
+        return {
+            message: "Autenticación exitosa",
+            token
+        }
+    },
+
+    // Crear un nuevo usuario
+    createUser: async ({ input }, { currentUser }) => {
+        const existingUser = await User.findOne({ email: input.email })
+        if (existingUser) throw new Error("Usuario ya existe")
+
+        const hashedPassword = await bcrypt.hash(input.password, 10)
+
+        // Si se intenta crear un usuario con rol "admin"
+        if (input.role === "admin") {
+            if (!currentUser?.email) {
+                throw new Error("Usuario no autenticado")
             }
-        },
 
-        // Crear un nuevo usuario
-        createUser: async (_, { input }) => {
-            const existingUser = await User.findOne({ email: input.email })
-            if (existingUser) throw new Error("Usuario ya existe")
-
-            const hashedPassword = await bcrypt.hash(input.password, 10)
-
-            // let role = "user" // asignamos rol por defecto de "user"
-
-            // // solo podrá asignar el rol de "admin" un usuario autenticado que tenga rol de "admin"
-            // if (input.role === "admin") {
-            //     const creator = await User.findOne({ email: currentUser?.email })
-            //     if (creator?.role === "admin") {
-            //         role = "admin"
-            //     } else {
-            //         throw new Error("Solo los administradores pueden crear otros administradores")
-            //     }
-            // }
-            const newUser = new User({ ...input, password: hashedPassword })
-            await newUser.save()
-
-            return "Usuario creado correctamente"
-        },
-
-        // Actualizar un usuario autenticado
-        updateUser: async (_, { input }, { currentUser }) => {
-            if (!currentUser?.email) throw new Error("No autenticado")
-
-            // Proteger contra intento de cambio de rol
-            if ("role" in input) {
-                throw new Error("No está permitido modificar el rol del usuario desde esta operación")
+            const creator = await User.findOne({ email: currentUser.email })
+            if (!creator || creator.role !== "admin") {
+                throw new Error("Solo los administradores pueden crear otros administradores")
             }
+        } else {
+            // Elimina el campo "role" si no es admin para que se aplique el valor por defecto del modelo
+            delete input.role
+        }
 
-            if (input.password && typeof input.password === 'string') {
-                input.password = await bcrypt.hash(input.password, 10)
-            }
+        const newUser = new User({
+            ...input,
+            password: hashedPassword,
+        })
 
-            await User.updateOne({ email: currentUser.email }, { $set: input })
-            return `Usuario con email ${currentUser.email} actualizado correctamente`
-        },
+        await newUser.save()
 
-        // Eliminar el usuario autenticado
-        deleteUser: async (_, __, { currentUser }) => {
-            if (!currentUser?.email) throw new Error("No autenticado")
+        return "Usuario creado correctamente"
+    },
 
-            // verifica si el usuario activo tiene el rol de "admin"
-            const dbUser = await User.findOne({ email: currentUser.email })
-            if (dbUser.role !== "admin") throw new Error("Acceso denegado: requiere rol admin")
+    // Actualizar un usuario autenticado
+    updateUser: async ({ input }, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
 
-            await User.deleteOne({ email: currentUser.email })
-            return `Usuario con email ${currentUser.email} eliminado correctamente`
-        },
+        // Proteger contra intento de cambio de rol
+        if ("role" in input) {
+            throw new Error("No está permitido modificar el rol del usuario desde esta operación")
+        }
 
-        // Añadir una tarjeta seleccionada al usuario autenticado
-        addUserCard: async (_, { cardId }, { currentUser }) => {
-            if (!currentUser?.email) throw new Error("No autenticado")
+        if (input.password && typeof input.password === 'string') {
+            input.password = await bcrypt.hash(input.password, 10)
+        }
 
-            const user = await User.findOne({ email: currentUser.email })
-            if (!user) throw new Error("Usuario no encontrado")
+        await User.updateOne({ email: currentUser.email }, { $set: input })
+        return `Usuario con email ${currentUser.email} actualizado correctamente`
+    },
 
-            const card = await Card.findById(cardId)
-            if (!card) throw new Error("Card no encontrada")
+    // Eliminar el usuario autenticado
+    deleteUser: async ({ email }, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
 
-            let userCards = await UserCard.findOne({ email: currentUser.email })
+        // Verificar si quien ejecuta la acción es admin
+        const dbUser = await User.findOne({ email: currentUser.email })
+        if (dbUser.role !== "admin") throw new Error("Acceso denegado: requiere rol admin")
 
-            if (userCards) {
-                const exists = userCards.selectedCards.some(
-                    c => String(c._id) === String(card._id)
-                )
-                if (!exists) {
-                    userCards.selectedCards.push(card)
-                    await userCards.save()
-                }
-            } else {
-                userCards = new UserCard({
-                    email: currentUser.email,
-                    selectedCards: [card]
-                })
+        // Verificar si el usuario a eliminar existe
+        const targetUser = await User.findOne({ email })
+        if (!targetUser) throw new Error("Usuario a eliminar no encontrado")
+
+        // No dejar que un admin se elimine a sí mismo (opcional)
+        if (email === currentUser.email) {
+            throw new Error("No puedes eliminarte a ti mismo desde esta operación")
+        }
+
+        await User.deleteOne({ email })
+        return `Usuario con email ${email} eliminado correctamente`
+    },
+
+    // Crear un nuevo voluntariado (solo el propio usuario puede crear uno)
+    createCard: async ({ input }, { currentUser, io }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
+
+        if (currentUser.email !== input.email) {
+            throw new Error("Solo puedes crear voluntariados con tu propio email")
+        }
+
+        const user = await User.findOne({ email: currentUser.email })
+        if (!user) throw new Error("Usuario autenticado no encontrado")
+
+        if (user.name !== input.autor) {
+            throw new Error("El autor no corresponde con el usuario autenticado")
+        }
+
+        if (input.volunType && !["Oferta", "Petición"].includes(input.volunType)) {
+            throw new Error("Tipo de voluntariado incorrecto, debe ser 'Oferta' o 'Petición'")
+        }
+
+        const newCard = new Card(input)
+        await newCard.save()
+
+
+        return newCard
+    },
+
+    // Actualiza los datos de un voluntariado
+    updateCard: async ({ cardId, input }, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
+
+        if (!isValidObjectId(cardId)) {
+            throw new Error("ID de voluntariado inválido")
+        }
+
+        const card = await Card.findById(cardId)
+        if (!card) throw new Error("Voluntariado no encontrado")
+
+        const dbUser = await User.findOne({ email: currentUser.email })
+        if (!dbUser) throw new Error("Usuario autenticado no encontrado")
+
+        const isAdmin = dbUser.role === "admin"
+        const isOwner = card.email === currentUser.email
+
+        if (!isAdmin && !isOwner) {
+            throw new Error("Solo puedes modificar tus propios voluntariados")
+        }
+
+        if (input.volunType && !["Oferta", "Petición"].includes(input.volunType)) {
+            throw new Error("Tipo de voluntariado incorrecto, debe ser 'Oferta' o 'Petición'")
+        }
+
+        await Card.findByIdAndUpdate(cardId, { $set: input })
+
+        return "Voluntariado actualizado correctamente"
+    },
+
+    // Elimina un voluntariado
+    deleteCard: async ({ cardId }, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
+
+        if (!mongoose.Types.ObjectId.isValid(cardId)) {
+            throw new Error("ID de voluntariado inválido")
+        }
+
+        const card = await Card.findById(cardId)
+        if (!card) throw new Error("Voluntariado no encontrado")
+
+        const dbUser = await User.findOne({ email: currentUser.email })
+        if (!dbUser) throw new Error("Usuario autenticado no encontrado")
+
+        const isAdmin = dbUser.role === "admin"
+        const isOwner = card.email === currentUser.email
+
+        if (!isAdmin && !isOwner) {
+            throw new Error("Solo puedes eliminar tus propios voluntariados")
+        }
+
+        await Card.findByIdAndDelete(cardId)
+        return `Voluntariado con ID ${cardId} eliminado correctamente`
+    },
+
+    // Añadir una tarjeta seleccionada al usuario autenticado
+    addUserCard: async ({ cardId }, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
+
+        if (!cardId || !mongoose.Types.ObjectId.isValid(cardId)) {
+            throw new Error("ID de tarjeta inválido")
+        }
+
+        const user = await User.findOne({ email: currentUser.email })
+        if (!user) throw new Error("Usuario no encontrado")
+
+        const card = await Card.findById(cardId)
+        if (!card) throw new Error("Card no encontrada")
+
+        let userCards = await UserCard.findOne({ email: currentUser.email })
+
+        if (userCards) {
+            const exists = userCards.selectedCards.some(
+                c => String(c.id) === String(card._id)
+            )
+            if (!exists) {
+                userCards.selectedCards.push(card._id) // solo guarda el ID
                 await userCards.save()
             }
-
-            return "Voluntariado añadido a la selección correctamente"
-        },
-
-        // Eliminar una tarjeta seleccionada del usuario autenticado
-        deleteUserCard: async (_, { cardId }, { currentUser }) => {
-            if (!currentUser?.email) throw new Error("No autenticado")
-
-            const userCards = await UserCard.findOne({ email: currentUser.email })
-            if (!userCards) throw new Error("No se encontró el usuario")
-
-            const objectId = new ObjectId(cardId)
-            const exists = userCards.selectedCards.some(
-                c => String(c._id) === String(objectId)
-            )
-
-            if (!exists) throw new Error("El voluntariado no fue seleccionado para este usuario")
-
-            await UserCard.updateOne(
-                { email: currentUser.email },
-                { $pull: { selectedCards: { _id: objectId } } }
-            )
-
-            return "Voluntariado eliminado de la selección correctamente"
+        } else {
+            userCards = new UserCard({
+                email: currentUser.email,
+                selectedCards: [card._id] // solo IDs aquí también
+            })
+            await userCards.save()
         }
+
+        return "Voluntariado añadido a la selección correctamente"
+    },
+
+    // Eliminar una tarjeta seleccionada del usuario autenticado
+    deleteUserCard: async ({ cardId }, { currentUser }) => {
+        if (!currentUser?.email) throw new Error("No autenticado")
+
+        const userCards = await UserCard.findOne({ email: currentUser.email })
+        if (!userCards) throw new Error("No se encontró el usuario")
+
+        const objectId = new ObjectId(cardId)
+        const exists = userCards.selectedCards.some(
+            c => String(c._id) === String(objectId)
+        )
+
+        if (!exists) throw new Error("El voluntariado no fue seleccionado para este usuario")
+
+        await UserCard.updateOne(
+            { email: currentUser.email },
+            { $pull: { selectedCards: objectId } }
+        )
+
+        return "Voluntariado eliminado de la selección correctamente"
     }
 }
 
-module.exports = resolversMongoose
+module.exports = resolvers
