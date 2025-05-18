@@ -8,7 +8,7 @@ export const graphqlRequest = async (query, variables = {}, token = "") => {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch("https://pd48ct-3000.csb.app/graphql", {
+  const response = await fetch(window.location.origin + "/graphql", {
     method: "POST",
     headers,
     body: JSON.stringify({ query, variables }),
